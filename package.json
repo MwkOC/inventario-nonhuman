@@ -4,19 +4,34 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
-    "test:e2e": "npm run build && playwright test"
+    "dev": "next dev --hostname 127.0.0.1 --port 5174",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 --port 5174",
+    "test:e2e": "npm run build && playwright test",
+    "test": "node --test --test-concurrency=1 tests/backend.test.mjs",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/manage.mjs migrate",
+    "db:import-legacy": "node --env-file-if-exists=.env.local scripts/manage.mjs import-legacy",
+    "db:import-members": "node --env-file-if-exists=.env.local scripts/manage.mjs import-members",
+    "db:bootstrap": "node --env-file-if-exists=.env.local scripts/manage.mjs bootstrap",
+    "db:seed": "node --env-file-if-exists=.env.local scripts/manage.mjs seed-demo",
+    "mail:send": "node --env-file-if-exists=.env.local scripts/manage.mjs send-mail",
+    "db:cleanup": "node --env-file-if-exists=.env.local scripts/manage.mjs cleanup"
+  },
+  "engines": {
+    "node": "24.x"
   },
   "dependencies": {
+    "csv-parse": "^7.0.3",
+    "lucide-react": "^0.468.0",
+    "next": "16.4.0",
+    "pg": "^8.23.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "lucide-react": "^0.468.0",
-    "recharts": "^3.0.0"
+    "read-excel-file": "^9.3.12",
+    "recharts": "^3.0.0",
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
-    "vite": "^7.0.0",
-    "@vitejs/plugin-react": "^5.0.0",
     "@playwright/test": "^1.55.0"
   }
 }

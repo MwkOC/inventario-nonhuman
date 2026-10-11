@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
 import {
   LayoutDashboard,
   Boxes,
@@ -40,7 +39,6 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import "./style.css";
 
 let csrf = "";
 async function api(action, body, form = false) {
@@ -313,7 +311,7 @@ function Login({ onLogin, demo }) {
   );
 }
 
-function App() {
+export default function App() {
   const [user, setUser] = useState(null),
     [data, setData] = useState(null),
     [ready, setReady] = useState(false),
@@ -336,6 +334,10 @@ function App() {
     [peopleFilter, setPeopleFilter] = useState("all");
   const [importRows, setImportRows] = useState(null),
     [importBusy, setImportBusy] = useState(false);
+  useEffect(() => {
+    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production")
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }, []);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("nh-theme", theme);
@@ -1909,6 +1911,3 @@ function Metric({ label, value, icon: Icon, detail, green, amber }) {
     </section>
   );
 }
-createRoot(document.getElementById("root")).render(<App />);
-if ("serviceWorker" in navigator && import.meta.env.PROD)
-  navigator.serviceWorker.register("/sw.js");

@@ -1,5 +1,7 @@
 .venv/
 node_modules/
+.next/
+.vercel/
 dist/
 staticfiles/
 *.sqlite3*

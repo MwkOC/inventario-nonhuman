@@ -1,80 +1,80 @@
 # NonHuman Lab
 
-Aplicacion de inventario, prestamos, asistencia y visitas.
-React + Vite, Django 5.2 y PostgreSQL en produccion; SQLite en desarrollo.
+Next.js 16 App Router: interfaz y API Node.js en un solo proceso. Node 24 requerido.
+PostgreSQL en produccion; SQLite de Node para desarrollo y pruebas locales.
 
+- [Requisitos](REQUISITOS_LABORATORIO.md)
 - [Despliegue y operacion](DESPLIEGUE_LEO.md)
-- [Requisitos funcionales](REQUISITOS_LABORATORIO.md)
 
-## Desarrollo local
-
-Requisitos: Python 3.12 y Node 24. Comandos para Linux/macOS:
+## Desarrollo
 
 ```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
 npm ci
-.venv/bin/python manage.py migrate
-.venv/bin/python manage.py seed_demo
-```
-
-En dos terminales:
-
-```sh
-.venv/bin/python manage.py runserver 127.0.0.1:8000
-```
-
-```sh
+npm run db:migrate
 npm run dev
 ```
 
-Abrir http://localhost:5173. No exponer estos servidores a internet.
+Abrir http://localhost:5174. No se necesita Python ni un servidor adicional.
+Next.js y los comandos de gestion leen .env.local, que no se versiona.
+Sin configuracion, la base local es db.next.sqlite3 y la demo esta desactivada.
 
-La demo contiene datos ficticios. DNI: admin `10000001`, miembro `10000006`,
-externo `10000016`. Contrasena de demo: `NonHuman2026!`.
-`seed_demo` no sobreescribe cuentas y esta bloqueado en produccion.
+En este equipo, .env.local selecciona db.next.members.sqlite3: copia migrada de las
+17 cuentas. db.members.sqlite3 se conserva intacta como origen privado. No hay
+contrasena comun; los hashes compatibles se conservan y actualizan al iniciar sesion.
+Las sesiones y los enlaces Django anteriores ya no sirven.
 
-## Base local de miembros
-
-La base privada existente se conserva en `db.members.sqlite3`; no forma parte del repo.
-Para usarla desde la raiz del proyecto:
+Para generar nuevos enlaces locales para cuentas sin contrasena:
 
 ```sh
-DATABASE_URL="sqlite:///$(pwd)/db.members.sqlite3" DEMO_MODE=0 .venv/bin/python manage.py runserver 127.0.0.1:8000
+node --env-file-if-exists=.env.local scripts/manage.mjs queue-access --apply
+npm run mail:send
 ```
 
-Cada persona usa su DNI y crea su propia contrasena. En desarrollo, los enlaces de
-activacion y recuperacion se guardan en `local-emails/`; no se envian correos reales.
+Los enlaces quedan en local-emails/. No se envian correos externos en desarrollo.
+Cada enlace vence en una hora; un reenvio exitoso invalida el anterior.
+Si el envio falla, el enlace anterior sigue siendo valido hasta su vencimiento.
 
-## Pruebas
+## Demo separada
+
+Linux/macOS, en una base distinta a la de miembros:
 
 ```sh
-.venv/bin/python manage.py test
-.venv/bin/python manage.py makemigrations --check --dry-run
+DATABASE_URL=sqlite:./db.next.demo.sqlite3 npm run db:migrate
+DATABASE_URL=sqlite:./db.next.demo.sqlite3 DEMO_MODE=1 npm run db:seed
+DATABASE_URL=sqlite:./db.next.demo.sqlite3 DEMO_MODE=1 npm run dev
+```
+
+Cuentas ficticias: admin 10000001, miembro 10000006, externo 10000016.
+Contrasena de demo: NonHuman2026!. El sembrado no sobreescribe datos existentes
+y esta prohibido en produccion y bases de miembros.
+
+## Pruebas y build
+
+```sh
+npm test
 npx playwright install chromium
 npm run test:e2e
-```
-
-Playwright compila la interfaz e inicia un servidor aislado en el puerto 8765 con
-`db.e2e.sqlite3` y usuarios ficticios. No usa la base de miembros ni los servidores
-locales en 8000/5173. Las capturas quedan en `test-results/`.
-
-## Build
-
-```sh
 npm run build
+npm start
 ```
 
-El resultado esta en `dist/`. Reiniciar Django para revisar el build en
-http://localhost:8000. La PWA necesita conexion y HTTPS fuera de localhost.
+Las pruebas de backend usan una base temporal y fixtures ficticios. Para PostgreSQL,
+definir TEST_DATABASE_URL apuntando a una base descartable cuyo nombre termine en
+_test. La suite borra sus tablas de prueba; nunca usar una base con datos reales.
+
+Playwright usa db.next.e2e.sqlite3 y Next.js en 8766. No toca la base de miembros.
+Las capturas quedan en test-results/. npm start sirve el build en 5174.
+No ejecutar npm start y npm run dev en el mismo puerto.
 
 ## Estructura
 
-- `src/`: interfaz y estilos.
-- `lab/`: modelos, API, migraciones, importacion y pruebas.
-- `server/`: configuracion y rutas.
-- `public/`: recursos estaticos y PWA.
-- `Dockerfile`, `render.yaml`: despliegue.
-- `.github/workflows/check.yml`: pruebas y construccion automatizadas.
+- app/: paginas, metadatos, API y health check.
+- src/: interfaz y estilos.
+- lib/: autenticacion, SQL, reglas del laboratorio, correo, importacion y migracion.
+- scripts/manage.mjs: comandos operativos; migrations explicitas con db:migrate.
+- tests/: pruebas de backend y navegador.
+- public/: recursos y PWA con conexion requerida.
+- vercel.json: despliegue Next.js; sin funciones Python.
+- .github/workflows/check.yml: SQLite, PostgreSQL y navegador.
 
-No versionar Excel de miembros, bases, correos, claves ni backups.
+No versionar Excel, bases, correos locales, archivos .env, tokens, claves ni backups.

@@ -1,114 +1,136 @@
 # Despliegue de NonHuman Lab
 
-Un contenedor sirve React compilado y Django mediante Gunicorn. PostgreSQL conserva
-los datos; Resend envia activaciones y recuperaciones por HTTPS.
+Next.js sirve la interfaz y la API Node.js en el mismo proyecto Vercel.
+PostgreSQL externo conserva los datos y Resend envia activaciones y recuperaciones.
+No se necesita Django, Python, Docker ni otro servidor de API.
 
-## Requisitos
+## Configuracion
 
-- Repositorio privado y alojamiento con Docker, HTTPS y acceso a PostgreSQL.
-- PostgreSQL accesible desde el alojamiento, con SSL. No usar SQLite en produccion.
-- Cuenta Resend con remitente verificado.
-- Lista de miembros entregada por canal privado, no mediante GitHub.
-- Responsable de backups y del dominio. Confirmar el uso actual de `lab.nonhuman.lat`
-  antes de cambiar DNS.
+Importar el repositorio en Vercel: directorio raiz, framework Next.js, Node 24,
+build npm run build y directorio de salida predeterminado. No usar export estatico.
+Confirmar condiciones y elegibilidad del [plan Hobby](https://vercel.com/docs/plans/hobby);
+PostgreSQL y correo tienen cuotas propias. No prometer costo cero sin revisarlas.
 
-Render puede configurarse con `render.yaml`. Revisar cuotas y condiciones del
-[plan gratuito](https://render.com/docs/free) antes de contratar. No depender del
-disco efimero del contenedor para conservar datos.
-
-## Variables
-
-Configurar en el alojamiento usando `.env.example` como referencia:
+Variables privadas del proyecto (ninguna debe tener prefijo NEXT_PUBLIC_):
 
 | Variable | Valor |
 | --- | --- |
-| NONHUMAN_DEBUG | 0 |
+| APP_ENV | production |
 | DEMO_MODE | 0 |
-| SECRET_KEY | Aleatoria, minimo 50 caracteres; conservar entre despliegues |
-| DATABASE_URL | Conexion PostgreSQL con SSL |
-| PUBLIC_URL | Origen HTTPS publico, sin ruta |
-| RESEND_API_KEY | Clave privada del servicio de correo |
+| DATABASE_URL | PostgreSQL externo; preferir URL agrupada apta para serverless |
+| PUBLIC_URL | URL estable HTTPS de la app, sin barra final ni ruta |
+| SECRET_KEY | Secreto aleatorio de al menos 50 caracteres |
+| RESEND_API_KEY | Clave privada de Resend |
 | DEFAULT_FROM_EMAIL | Remitente verificado |
-| BOOTSTRAP_ADMIN_DNI | DNI del primer administrador |
-| BOOTSTRAP_ADMIN_EMAIL | Correo del primer administrador |
-| BOOTSTRAP_ADMIN_NAME | Nombre completo, igual al Excel |
-| ALLOWED_HOSTS | Hosts adicionales separados por comas, si son necesarios |
+| BOOTSTRAP_ADMIN_DNI | Solo para crear la primera cuenta en una base nueva |
+| BOOTSTRAP_ADMIN_EMAIL | Correo personal del primer administrador |
+| BOOTSTRAP_ADMIN_NAME | Nombre del primer administrador |
 
-El hostname de PUBLIC_URL y el de Render se permiten automaticamente.
-Django lee el entorno; no carga `.env` por si solo. No usar los marcadores del ejemplo
-como credenciales. Generar un secreto con:
+En Vercel se fuerzan los controles de produccion aunque APP_ENV este mal configurado.
+SQLite y correo en disco estan prohibidos en produccion. La conexion PostgreSQL
+exige TLS con certificado valido; no desactivar su verificacion. El pool tiene
+un maximo de tres conexiones por instancia.
 
-```sh
-python -c "import secrets; print(secrets.token_urlsafe(64))"
-```
-
-## Primer despliegue
-
-1. Revisar que CI pase en GitHub: pruebas SQLite/PostgreSQL, navegador y build Docker.
-2. Crear PostgreSQL externo y configurar las variables.
-3. En Render, conectar la repo como Blueprint usando `render.yaml`; o construir la
-   imagen con `docker build -t nonhuman-lab .` en otro alojamiento.
-4. El arranque aplica migraciones, crea el primer administrador si no existe y
-   procesa invitaciones pendientes. No crea contrasenas ni datos de demo.
-5. Verificar `/healthz`: debe devolver 200 y `{"status":"ok"}`.
-6. Abrir el correo del administrador y crear su contrasena. Retirar las variables
-   BOOTSTRAP_ADMIN una vez confirmado el acceso.
-7. Importar miembros y verificar roles, correo y permisos.
-8. Probar Android/iOS y restaurar un backup de prueba antes de incorporar uso real.
-9. Asociar el dominio solo despues de aprobar la URL temporal y coordinar con Leo.
-
-Otros alojamientos deben ejecutar `scripts/start.sh` detras de un proxy HTTPS que
-reescriba X-Forwarded-Proto; no exponer Gunicorn directamente a internet.
-
-## Importacion de miembros
-
-El Excel admite `Nombres, Apellidos, DNI, Correo`; tambien se acepta
-`nombre,dni,correo,rol`. Conservar DNI como texto si tiene ceros iniciales.
-
-La lista inicial tiene 17 cuentas: 3 administradores y 14 miembros. Confirmar los DNI
-de Mauricio, Leonardo Perez y Diego Pozo contra el Excel privado, nunca por coincidencia
-parcial de nombre.
-
-Desde un entorno privado con las variables de la base destino:
+Generar SECRET_KEY:
 
 ```sh
-python manage.py import_members /ruta/privada/miembros.xlsx --admin-dni DNI_MAURICIO --admin-dni DNI_LEO --admin-dni DNI_DIEGO --skip-existing
+node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"
 ```
 
-Revisar el resumen y repetir con `--apply`. Luego ejecutar:
+PUBLIC_URL debe ser la URL estable, por ejemplo https://inventario-nonhuman.vercel.app.
+Las previews necesitan base, secretos y PUBLIC_URL propios; nunca reutilizar la base
+de produccion. Los POST solo aceptan ese origen, cookie CSRF firmada y su encabezado.
+Las sesiones usan cookies HttpOnly, Secure y SameSite=Lax, con 30 dias renovables.
+
+## Base y primera publicacion
+
+1. Configurar las variables en Vercel y en un entorno privado autorizado para gestionar
+   la base. Los comandos npm de gestion leen .env.local, excluido de Git.
+2. Ejecutar npm ci y npm run db:migrate contra la base destino.
+3. Elegir una sola opcion: migrar datos existentes (seccion siguiente), o crear una
+   instalacion vacia con npm run db:bootstrap. No ejecutar bootstrap antes de importar
+   una base completa, porque la importacion exige un destino vacio.
+4. Para cuentas sin contrasena, ejecutar queue-access y npm run mail:send.
+5. Desplegar y comprobar /healthz: 200 y {"status":"ok"}. Verificar que /api/session
+   devuelva JSON, cookie CSRF y Cache-Control no-store.
+6. Probar activacion, login, recarga, cierre, recuperacion, permisos de los tres roles,
+   retiro y devolucion propia tanto de miembro como de administrador.
+7. Probar Android/iOS, ambos temas y restaurar un backup en una base separada.
+8. Coordinar con Leo antes de modificar DNS de lab.nonhuman.lat. Cambiar PUBLIC_URL
+   al dominio definitivo y volver a desplegar.
+
+Las migraciones y bootstrap son pasos operativos explicitos. No se ejecutan al
+compilar, al arrancar una funcion ni en una peticion de usuario.
+Retirar las variables BOOTSTRAP_ADMIN una vez creada la cuenta inicial.
+
+## Migrar desde Django
+
+Respaldar la base original y detener escrituras antes de obtener la copia de migracion.
+El importador lee una base SQLite Django en modo solo lectura; no requiere Python.
 
 ```sh
-python manage.py send_pending_mail
+npm run db:import-legacy -- /ruta/privada/db.members.sqlite3
+npm run db:migrate
+npm run db:import-legacy -- /ruta/privada/db.members.sqlite3 --apply
 ```
 
-`--skip-existing` solo omite cuentas activas cuyo nombre, correo y rol coinciden
-exactamente. Cualquier diferencia bloquea la importacion; nunca sobreescribe personas
-ni cambia permisos. Esto permite conservar la cuenta creada por bootstrap.
-Las otras personas se crean como miembros, aunque el archivo indique otro rol.
+La primera orden valida y muestra conteos sin modificar el destino. La importacion
+conserva IDs, cuentas, roles, hashes, articulos, asistencia, visitas, prestamos,
+eventos, notificaciones y cola de correos. Es atomica y rechaza destinos con datos;
+no mezclar ni sobrescribir bases. Verificar conteos antes de habilitar escrituras.
 
-Si el alojamiento no ofrece consola, ejecutar estos comandos desde un equipo autorizado
-con acceso SSL a PostgreSQL. No subir el Excel al directorio publico ni al contenedor.
-El panel permite altas individuales e importacion con previsualizacion; sin columna rol
-las altas son miembros, por lo que las altas administrativas requieren seleccionar su rol.
+Las contrasenas Django PBKDF2-SHA256 siguen funcionando y se actualizan a scrypt
+al iniciar sesion. Un algoritmo no soportado detiene la migracion. No se migran
+sesiones ni tokens Django: las personas deben iniciar sesion otra vez y solicitar
+nuevos enlaces. Para cuentas activas sin contrasena:
+
+```sh
+node --env-file-if-exists=.env.local scripts/manage.mjs queue-access --apply
+npm run mail:send
+```
+
+En este equipo ya existe una copia local migrada db.next.members.sqlite3.
+No subir ninguna de las dos bases a GitHub o Vercel. Para produccion, importar desde
+la copia Django original antes de registrar nuevos movimientos en la copia Next.js.
+Si ya se usaron ambas versiones, detenerse y reconciliar datos antes de importar.
+
+## Importar miembros nuevos
+
+Admite XLSX/CSV, hasta 2 MB y 500 filas, con Nombres, Apellidos, DNI, Correo.
+Mantener DNI como texto si tiene ceros iniciales.
+
+```sh
+npm run db:import-members -- /ruta/privada/miembros.xlsx --admin-dni DNI_ADMIN_1 --admin-dni DNI_ADMIN_2 --admin-dni DNI_ADMIN_3 --skip-existing
+```
+
+Primero revisar el resumen; repetir con --apply. Los DNI declarados seran administradores;
+los demas, miembros. --skip-existing solo conserva cuentas activas con nombre, correo
+y rol exactamente iguales. No modifica cuentas existentes ni envia correos: luego
+ejecutar npm run mail:send. El panel tambien ofrece importacion con previsualizacion.
 
 ## Operacion
 
-- Reintentar correos: `python manage.py send_pending_mail`. El arranque tambien
-  reintenta pendientes. No existe un worker periodico de correo.
-- Limpiar sesiones vencidas: `python manage.py clearsessions`, programado diariamente.
-- Exportar backups con `pg_dump --format=custom` usando credenciales protegidas;
-  almacenarlos fuera del alojamiento y probar `pg_restore` en una base separada.
-- Antes de actualizar: backup, CI aprobado y comprobacion de migraciones.
-  Un rollback de imagen no revierte cambios de base de datos.
-- Importar personas en lotes pequenos desde el panel: el envio de invitaciones es
-  sincrono. Revisar correos pendientes si el proveedor falla.
+- npm run mail:send: procesa hasta 100 correos pendientes; repetir si quedan mas.
+  Las peticiones de alta/recuperacion envian hasta tres mediante after() de Next.js.
+  Los restantes o fallidos quedan en cola; no hay worker periodico configurado.
+- npm run db:cleanup: limpiar sesiones, tokens y limites expirados, diariamente desde
+  un equipo o tarea autorizada. Las sesiones vencidas ya no conceden acceso.
+- Respaldar PostgreSQL con pg_dump --format=custom y probar pg_restore en otra base.
+- Antes de actualizar: backup, CI aprobado y migraciones revisadas. Revertir el
+  deployment no revierte el esquema ni datos.
+- Las operaciones usan transacciones y un bloqueo asesor PostgreSQL compartido para
+  serializar movimientos del laboratorio pequeno. Revisar esta estrategia al crecer.
+- /healthz valida la conexion y version de esquema; no demuestra entrega de correo,
+  restauracion de backups ni funcionamiento visual.
 
-## Validacion pendiente
+El deployment publico, correo real, dominio y restauracion requieren validacion en
+infraestructura destino. Las pruebas locales no los sustituyen.
+La migracion paso 33 pruebas de backend con SQLite y PostgreSQL local, cinco de
+navegador y build Next.js. No se ha realizado una auditoria de seguridad independiente.
 
-El despliegue publico, Docker, PostgreSQL real, correo y restauracion deben probarse
-en la infraestructura destino. CI esta preparado, pero debe ejecutarse tras subir la repo.
-`check --deploy` conserva los avisos HSTS W005/W021: no activar subdominios ni preload
-sin confirmar su alcance. No se ha realizado una auditoria de seguridad independiente.
+Las nuevas contrasenas usan scrypt N=131072, r=8, p=1, segun la
+[referencia de OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
 
-Referencias: [Django](https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/),
-[Render](https://render.com/docs/deploy-django), [health checks](https://render.com/docs/health-checks).
+Referencias: [Next.js en Vercel](https://vercel.com/docs/frameworks/full-stack/nextjs),
+[after](https://nextjs.org/docs/app/api-reference/functions/after),
+[PostgreSQL TLS](https://node-postgres.com/features/ssl).
