@@ -27,7 +27,10 @@ Repo publico: https://github.com/MwkOC/inventario-nonhuman.
 
 - db.members.sqlite3 es el origen Django privado y no se modifica.
 - db.next.members.sqlite3 es una copia local migrada con las 17 cuentas y mismos roles.
-  .env.local la selecciona para Next.js. No se generaron contrasenas comunes.
+  .env.local la selecciona para Next.js. Las contrasenas de las cuentas reales no se modificaron.
+- Se agregaron tres cuentas ficticias locales, una por rol, para probar sin correo.
+  Sus credenciales no se guardan en el repo. No trasladar estas cuentas ni sus
+  registros de prueba a produccion. Login y logout verificados para los tres roles.
 - Sesiones y enlaces anteriores quedan invalidados. Generar nuevos enlaces para
   cuentas sin contrasena con queue-access y mail:send.
 - local-emails/ contiene enlaces sensibles locales, no correos externos enviados.

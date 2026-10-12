@@ -23,6 +23,19 @@ En este equipo, .env.local selecciona db.next.members.sqlite3: copia migrada de 
 contrasena comun; los hashes compatibles se conservan y actualizan al iniciar sesion.
 Las sesiones y los enlaces Django anteriores ya no sirven.
 
+### Acceso local sin correo
+
+En este equipo se agregaron tres cuentas ficticias a la copia local: administrador,
+miembro y externo. Las 17 cuentas reales y sus contrasenas se conservaron intactas.
+Las credenciales de estas cuentas locales se entregaron por separado y no se versionan.
+Se verificaron el inicio y cierre de sesion de los tres roles.
+
+Estas cuentas no se crean al clonar el repositorio ni al desplegar. Para probar en
+otro equipo sin correo, usar la demo separada descrita abajo; no cargar cuentas de
+prueba en produccion. Los movimientos locales de prueba persisten en la base local.
+
+### Activacion de cuentas reales
+
 Para generar nuevos enlaces locales para cuentas sin contrasena:
 
 ```sh

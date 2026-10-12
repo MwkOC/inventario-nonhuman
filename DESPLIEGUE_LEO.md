@@ -94,6 +94,12 @@ No subir ninguna de las dos bases a GitHub o Vercel. Para produccion, importar d
 la copia Django original antes de registrar nuevos movimientos en la copia Next.js.
 Si ya se usaron ambas versiones, detenerse y reconciliar datos antes de importar.
 
+La copia Next.js local contiene ademas tres cuentas ficticias de prueba, una por rol.
+No copiar esa base completa a produccion ni trasladar esas cuentas o sus movimientos.
+DEMO_MODE=0 no elimina ni desactiva cuentas existentes: su exclusion debe verificarse
+al preparar los datos. Las cuentas reales deben activar su propia contrasena mediante
+correo; las credenciales locales de prueba no forman parte de la entrega a produccion.
+
 ## Importar miembros nuevos
 
 Admite XLSX/CSV, hasta 2 MB y 500 filas, con Nombres, Apellidos, DNI, Correo.
